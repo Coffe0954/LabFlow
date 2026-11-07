@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: labflow
+          POSTGRES_PASSWORD: labflow
+          POSTGRES_DB: labflow_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U labflow" --health-interval 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://labflow:labflow@localhost:5432/labflow_test
+      TEST_DATABASE_URL: postgresql+asyncpg://labflow:labflow@localhost:5432/labflow_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: Линтер
+        run: ruff check . && ruff format --check .
+      - name: Типы
+        run: mypy app
+      - name: Миграции применяются и совпадают с моделями
+        run: alembic upgrade head && alembic check && alembic downgrade base
+      - name: Тесты
+        run: pytest -q
+      - name: OpenAPI-схема актуальна (типы фронтенда не устарели)
+        run: python -m app.export_openapi openapi.json && git diff --exit-code openapi.json
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Типы API соответствуют openapi.json
+        run: npm run gen:api && git diff --exit-code src/api/schema.d.ts
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build

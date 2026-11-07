@@ -1,0 +1,38 @@
+# Render Blueprint: Dashboard → New → Blueprint → выбрать этот репозиторий.
+# Создаёт бесплатную PostgreSQL и один веб-сервис (сайт + API + WebSocket).
+# Внимание: бесплатную базу Render удаляет примерно через 30 дней после создания.
+
+databases:
+  - name: labflow-db
+    plan: free
+    databaseName: labflow
+    user: labflow
+
+services:
+  - type: web
+    name: labflow
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: labflow-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      # Создать демо-курс, очередь на сегодня и аккаунты admin / teacher / student.
+      - key: SEED_DEMO
+        value: "true"
+      # Пароли демо-аккаунтов Render спросит при создании. Пустой — аккаунт не создаётся.
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      - key: SEED_TEACHER_PASSWORD
+        sync: false
+      - key: SEED_STUDENT_PASSWORD
+        sync: false
