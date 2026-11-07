@@ -1,0 +1,39 @@
+# Локальный запуск: docker compose up -d db  (или весь стек: docker compose up --build)
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: labflow
+      POSTGRES_PASSWORD: labflow
+      POSTGRES_DB: labflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U labflow"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://labflow:labflow@db:5432/labflow
+      SECRET_KEY: ${SECRET_KEY:-local-dev-secret-not-for-production-use}
+      CORS_ORIGINS: '["http://localhost:8080"]'
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata:

@@ -1,0 +1,26 @@
+// Типы берутся из сгенерированной схемы OpenAPI (npm run gen:api).
+import type { components } from './schema'
+
+type S = components['schemas']
+
+export type User = S['UserOut']
+export type TokenOut = S['TokenOut']
+export type Discipline = S['DisciplineOut']
+export type Lab = S['LabOut']
+export type Queue = S['QueueOut']
+export type QueueState = S['QueueState']
+export type Entry = S['EntryPublic']
+export type EntryDetail = S['EntryDetail']
+export type EntryStatus = Entry['status']
+export type TestOut = S['TestOut']
+export type TestDetail = S['TestDetail']
+export type QuestionOut = S['QuestionOut']
+export type QuestionIn = S['QuestionIn']
+export type QuestionKind = QuestionOut['kind']
+export type Attempt = S['AttemptOut']
+export type AttemptFull = S['AttemptFull']
+export type AttemptReview = S['AttemptReview']
+export type QueueStats = S['QueueStats']
+export type MyStats = S['MyStats']
+export type Ad = S['AdOut']
+export type Role = User['role']
