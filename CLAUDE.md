@@ -257,18 +257,10 @@ labflow/
 - **Контракт API:** при изменении API обновляем Pydantic-схемы и пересобираем типы на фронтенде.
 - **Секреты** и `.env` не коммитим. В репозитории лежит только `.env.example`.
 
-**Запуск локально:**
-```bash
-docker compose up -d db
-cd backend && pip install -e ".[dev]" && alembic upgrade head && uvicorn app.main:app --reload
-cd frontend && npm install && npm run dev
-```
-
-**Проверки перед PR:**
-```bash
-cd backend && ruff check . && mypy app && pytest
-cd frontend && npm run lint && npm run test && npm run build
-```
+**Локальный запуск и проверки:** актуальные команды описаны в `README.md`.
+Для первого запуска с демо-данными — `./dev.sh --seed`, для ежедневной работы —
+`./dev.sh`. Перед PR — `./check.sh`; проверки миграций и тесты на PostgreSQL —
+`./check.sh --postgres`.
 
 ## 15. Definition of Done для задачи
 

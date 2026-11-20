@@ -1,6 +1,6 @@
 # Render Blueprint: Dashboard → New → Blueprint → выбрать этот репозиторий.
 # Создаёт бесплатную PostgreSQL и один веб-сервис (сайт + API + WebSocket).
-# Внимание: бесплатную базу Render удаляет примерно через 30 дней после создания.
+# Бесплатная БД истекает через 30 дней; после 14 дней недоступности данные удаляются.
 
 databases:
   - name: labflow-db
@@ -15,8 +15,8 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    healthCheckPath: /health
-    autoDeploy: true
+    healthCheckPath: /ready
+    autoDeployTrigger: checksPass
     envVars:
       - key: DATABASE_URL
         fromDatabase:

@@ -2142,6 +2142,32 @@
           }
         }
       }
+    },
+    "/ready": {
+      "get": {
+        "tags": [
+          "service"
+        ],
+        "summary": "Ready",
+        "description": "Готовность принимать запросы: приложение отвечает, БД доступна.",
+        "operationId": "ready_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Ready Ready Get"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
