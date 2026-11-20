@@ -7,10 +7,11 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.api import ads, auth, entries, labs, queues, stats, tests
@@ -108,6 +109,23 @@ def create_app(
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.get("/ready", tags=["service"])
+    async def ready() -> dict[str, str]:
+        """Готовность принимать запросы: приложение отвечает, БД доступна."""
+
+        async def check_database() -> None:
+            async with app.state.session_factory() as db:
+                await db.execute(text("SELECT 1"))
+
+        try:
+            await asyncio.wait_for(check_database(), timeout=3)
+        except Exception as exc:
+            logger.warning("База данных недоступна при проверке готовности: %s", exc)
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE, "База данных недоступна"
+            ) from exc
+        return {"status": "ok"}
+
     if static_dir is not None:
         mount_frontend(app, Path(static_dir))
     return app
@@ -116,7 +134,7 @@ def create_app(
 def mount_frontend(app: FastAPI, root: Path) -> None:
     """Отдаёт собранный фронтенд: файлы как есть, остальные пути — index.html (SPA).
 
-    Регистрируется последним, поэтому /api, /docs и /health не перехватывает.
+    Регистрируется последним, поэтому /api, /docs, /health и /ready не перехватывает.
     """
     root = root.resolve()
     index = root / "index.html"

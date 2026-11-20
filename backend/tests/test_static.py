@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.main import create_app
 
@@ -33,10 +33,26 @@ async def test_frontend_is_served_with_spa_fallback(
         assert r.json() == {"detail": "Не найдено"}
 
         assert (await c.get("/health")).json() == {"status": "ok"}
+        assert (await c.get("/ready")).json() == {"status": "ok"}
         assert (await c.get("/api/v1/ads/active")).status_code == 200
 
         r = await c.get("/../secret.txt")  # выйти за пределы папки нельзя
         assert "секрет" not in r.text
+
+
+async def test_ready_reports_database_failure(tmp_path: Path) -> None:
+    # Путь к базе с отсутствующей родительской папкой: соединение должно завершиться ошибкой.
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'missing' / 'db.sqlite'}")
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    app = create_app(factory, start_ticker=False, static_dir=None)
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            assert (await c.get("/health")).status_code == 200
+            r = await c.get("/ready")
+            assert r.status_code == 503
+            assert r.json() == {"detail": "База данных недоступна"}
+    finally:
+        await engine.dispose()
 
 
 def test_database_url_from_hosting_uses_async_driver() -> None:

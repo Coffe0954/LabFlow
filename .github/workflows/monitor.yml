@@ -1,0 +1,73 @@
+name: Availability monitor
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: labflow-availability-monitor
+  cancel-in-progress: false
+
+jobs:
+  readiness:
+    # До первой выкладки адрес сайта неизвестен. Задайте переменную LABFLOW_URL в GitHub.
+    if: ${{ vars.LABFLOW_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    permissions:
+      issues: write
+    steps:
+      - name: Проверить сайт и БД
+        id: probe
+        continue-on-error: true
+        env:
+          LABFLOW_URL: ${{ vars.LABFLOW_URL }}
+        run: |
+          set -euo pipefail
+          base="${LABFLOW_URL%/}"
+          [[ "$base" == https://* ]] || { echo "LABFLOW_URL должен начинаться с https://" >&2; exit 1; }
+          for attempt in 1 2 3; do
+            if curl --fail --silent --show-error --location --max-time 90 "$base/ready" |
+              python3 -c 'import json, sys; sys.exit(json.load(sys.stdin).get("status") != "ok")'; then
+              echo "Сайт и БД доступны"
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then sleep 10; fi
+          done
+          exit 1
+
+      - name: Сообщить о сбое или восстановлении
+        uses: actions/github-script@v8
+        env:
+          PROBE_OUTCOME: ${{ steps.probe.outcome }}
+          LABFLOW_URL: ${{ vars.LABFLOW_URL }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const marker = '<!-- labflow-availability-monitor -->';
+            const title = 'LabFlow: сайт недоступен';
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', per_page: 100,
+            });
+            const incidents = issues.filter(issue =>
+              !issue.pull_request && issue.body?.includes(marker)
+            );
+
+            if (process.env.PROBE_OUTCOME !== 'success') {
+              if (incidents.length === 0) {
+                const baseUrl = process.env.LABFLOW_URL.replace(/\/$/, '');
+                await github.rest.issues.create({
+                  owner, repo, title,
+                  body: `${marker}\nПроверка ${baseUrl}/ready не прошла. ` +
+                    `Логи: ${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+                });
+              }
+              core.setFailed('Сайт или база данных недоступны');
+            } else {
+              for (const incident of incidents) {
+                await github.rest.issues.update({
+                  owner, repo, issue_number: incident.number, state: 'closed',
+                });
+              }
+            }
